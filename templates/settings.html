@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Settings</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+
+<style>
+
+.setting-card{
+background:white;
+padding:18px;
+border-radius:12px;
+margin-top:15px;
+display:flex;
+justify-content:space-between;
+align-items:center;
+}
+
+.toggle{
+position:relative;
+width:50px;
+height:25px;
+}
+
+.toggle input{
+display:none;
+}
+
+.slider{
+position:absolute;
+cursor:pointer;
+background:#ccc;
+border-radius:25px;
+top:0;
+left:0;
+right:0;
+bottom:0;
+transition:.3s;
+}
+
+.slider:before{
+content:"";
+position:absolute;
+height:18px;
+width:18px;
+left:4px;
+bottom:4px;
+background:white;
+border-radius:50%;
+transition:.3s;
+}
+
+input:checked + .slider{
+background:#2f5bd3;
+}
+
+input:checked + .slider:before{
+transform:translateX(24px);
+}
+
+.reset-btn{
+background:#ff4d4d;
+color:white;
+padding:10px 20px;
+border:none;
+border-radius:8px;
+cursor:pointer;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="dashboard">
+
+<h2>Settings</h2>
+
+<!-- Currency -->
+<div class="setting-card">
+<span>Currency</span>
+
+<select>
+<option>₹ INR</option>
+<option>$ USD</option>
+<option>€ EUR</option>
+</select>
+</div>
+
+<!-- Dark Mode -->
+<div class="setting-card">
+<span>Dark Mode</span>
+
+<label class="toggle">
+<input type="checkbox" onclick="toggleDark()">
+<span class="slider"></span>
+</label>
+</div>
+
+<!-- Notifications -->
+<div class="setting-card">
+<span>Notifications</span>
+
+<label class="toggle">
+<input type="checkbox" checked>
+<span class="slider"></span>
+</label>
+</div>
+
+<!-- Reset -->
+<div class="setting-card">
+<span>Reset Data</span>
+<button class="reset-btn" onclick="resetData()">Reset</button>
+</div>
+
+<div class="nav">
+<a href="/home">Home</a>
+<a href="/stats">Stats</a>
+<a href="/advisor">Advisor</a>
+<a href="/settings">Settings</a>
+</div>
+
+</div>
+
+<script>
+
+function resetData(){
+if(confirm("Delete all data?")){
+alert("Data cleared (backend integration needed)");
+}
+}
+
+function toggleDark(){
+document.body.classList.toggle("dark-mode");
+}
+
+</script>
+
+</body>
+</html>

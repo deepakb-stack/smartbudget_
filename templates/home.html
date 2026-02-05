@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Home</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+
+<script>
+function updateCategory(){
+
+let type=document.getElementById("type").value;
+let cat=document.getElementById("category");
+
+cat.innerHTML="";
+
+let income=["Salary","Business","Investment","Gift","Other"];
+let expense=["Food","Transport","Shopping","Bills","Entertainment","Health"];
+
+let list = type=="Income" ? income : expense;
+
+list.forEach(c=>{
+let opt=document.createElement("option");
+opt.text=c;
+cat.add(opt);
+});
+}
+</script>
+
+</head>
+
+<body onload="updateCategory()">
+
+<div class="main-container">
+
+<!-- LEFT SIDE DASHBOARD -->
+<div class="left-panel">
+
+<div class="top-bar">
+<h2>Welcome {{ user }}</h2>
+<a href="/logout" class="logout">Logout</a>
+</div>
+
+<div class="balance-card">
+<p>Current Balance</p>
+<h1>₹{{ balance }}</h1>
+<p>Income ₹{{ income }}</p>
+<p>Expense ₹{{ expense }}</p>
+</div>
+
+<div class="transaction-box">
+
+<h3>Recent Transactions</h3>
+
+{% for t in transactions %}
+
+<div class="transaction-item">
+<strong>{{ t[2] }}</strong> - {{ t[3] }}
+{% if t[4] %}
+<span class="desc">({{ t[4] }})</span>
+{% endif %}
+<span class="amount">₹{{ t[5] }}</span>
+</div>
+
+{% endfor %}
+
+</div>
+
+</div>
+
+
+<!-- RIGHT SIDE FORM -->
+<div class="right-panel">
+
+<div class="form-card">
+
+<h3>Add Transaction</h3>
+
+<form method="POST" action="/add_transaction">
+
+<select name="type" id="type" onchange="updateCategory()">
+<option value="Income">Income</option>
+<option value="Expense">Expense</option>
+</select>
+
+<select name="category" id="category"></select>
+
+<input name="description" placeholder="Description (Optional)">
+
+<input name="amount" type="number" placeholder="Amount" required>
+
+<button type="submit" class="add-btn">Add Transaction</button>
+
+</form>
+
+</div>
+
+</div>
+
+</div>
+
+<!-- NAV -->
+<div class="nav">
+<a href="/home">Home</a>
+<a href="/stats">Stats</a>
+<a href="/advisor">Advisor</a>
+<a href="/settings">Settings</a>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+<title>Login</title>
+</head>
+
+<body>
+
+<div class="card">
+
+<h2>Smart Budget Login</h2>
+
+<form method="POST">
+
+<input name="username" placeholder="Username" required>
+<input name="password" type="password" placeholder="Password" required>
+
+{% if error %}
+<p class="error">{{ error }}</p>
+{% endif %}
+
+<button type="submit">Login</button>
+
+</form>
+
+<a href="/register">Create Account</a>
+
+</div>
+
+</body>
+</html>
