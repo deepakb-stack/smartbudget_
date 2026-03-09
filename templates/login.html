@@ -5,28 +5,53 @@
 <title>Login</title>
 </head>
 
-<body>
+<body class="login-page login-enhanced">
 
-<div class="card">
+<div class="login-bg-shape shape-one"></div>
+<div class="login-bg-shape shape-two"></div>
+<div class="login-bg-shape shape-three"></div>
 
-<h2>Smart Budget Login</h2>
+<div class="login-header">
+
+<p class="auth-badge">Personal Finance Companion</p>
+<h1>Smart Budget Planner</h1>
+<p class="auth-tagline">Take control of your expenses with our powerful expense tracking tools</p>
+
+</div>
+
+<div class="login-center">
+
+<div class="card auth-card">
+
+<h2>Login</h2>
+<p class="auth-card-note">Sign in to continue managing your money smarter.</p>
 
 <form method="POST">
 
-<input name="username" placeholder="Username" required>
-<input name="password" type="password" placeholder="Password" required>
+<input name="username" placeholder="Username" autocomplete="username" required>
+<input name="password" type="password" placeholder="Password" autocomplete="current-password" required>
 
 {% if error %}
 <p class="error">{{ error }}</p>
+{% endif %}
+
+{% if success %}
+<p class="success">{{ success }}</p>
 {% endif %}
 
 <button type="submit">Login</button>
 
 </form>
 
+<div class="auth-links">
+<a href="/forgot-password">Forgot Password?</a>
 <a href="/register">Create Account</a>
+</div>
 
 </div>
+
+</div>
+
 
 </body>
 </html>

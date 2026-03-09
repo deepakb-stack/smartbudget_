@@ -1,0 +1,120 @@
+============================================================
+   SmartBudget - Setup Instructions for College Lab System
+============================================================
+
+PREREQUISITES:
+  - Python 3.10 or higher installed
+  - Git installed
+  - Internet connection (for first-time setup only)
+
+============================================================
+STEP 1: Clone the Repository
+============================================================
+
+   Open Command Prompt (or PowerShell) and run:
+
+   git clone https://github.com/deepakb-stack/smartbudget_.git
+   cd smartbudget_
+
+============================================================
+STEP 2: Create a Virtual Environment
+============================================================
+
+   python -m venv .venv
+
+   Activate it:
+
+   Windows (Command Prompt):
+       .venv\Scripts\activate
+
+   Windows (PowerShell):
+       .venv\Scripts\Activate.ps1
+
+   Linux/Mac:
+       source .venv/bin/activate
+
+============================================================
+STEP 3: Install Python Dependencies
+============================================================
+
+   pip install -r requirements.txt
+
+============================================================
+STEP 4: Install Ollama (for AI Advisor)
+============================================================
+
+   1. Download Ollama from: https://ollama.com/download
+   2. Install it (just run the installer, no special config needed)
+   3. Open a NEW terminal and pull the AI model:
+
+      ollama pull gemma3:1b
+
+      (This downloads ~815 MB, only needed once)
+
+   4. Keep Ollama running in the background.
+      It starts automatically after install on Windows.
+      If not running, open a terminal and type: ollama serve
+
+============================================================
+STEP 5: Run the Application
+============================================================
+
+   Make sure you are in the smartbudget_ folder with venv activated:
+
+   python app.py
+
+   The app will start at: http://127.0.0.1:5000
+
+   Open this URL in your browser (Chrome/Edge recommended).
+
+============================================================
+QUICK START (All Commands Together)
+============================================================
+
+   git clone https://github.com/deepakb-stack/smartbudget_.git
+   cd smartbudget_
+   python -m venv .venv
+   .venv\Scripts\activate
+   pip install -r requirements.txt
+   ollama pull gemma3:1b
+   python app.py
+
+============================================================
+TROUBLESHOOTING
+============================================================
+
+   Problem: "ollama" is not recognized
+   Fix: Close and reopen the terminal after Ollama installation,
+        or add Ollama to your system PATH.
+
+   Problem: AI Advisor says "Cannot connect to Ollama"
+   Fix: Open a separate terminal and run: ollama serve
+        Then try the AI Advisor again.
+
+   Problem: AI Advisor says "Model not found"
+   Fix: Run: ollama pull gemma3:1b
+        Wait for the download to finish, then try again.
+
+   Problem: "pip" is not recognized
+   Fix: Use "python -m pip" instead of "pip"
+        Example: python -m pip install -r requirements.txt
+
+   Problem: "python" is not recognized
+   Fix: Try "python3" instead of "python"
+        Or reinstall Python and check "Add to PATH" during install.
+
+   Problem: PowerShell script execution error
+   Fix: Run this first:
+        Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+============================================================
+NOTES
+============================================================
+
+   - The database (database.db) is created automatically on first run.
+   - Each user's data is stored separately - register a new account.
+   - The AI Advisor requires Ollama to be running in the background.
+   - The app runs on port 5000 by default.
+   - Model gemma3:1b is lightweight (~1-2 GB RAM) and works on low-end PCs.
+
+============================================================

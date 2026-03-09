@@ -3,86 +3,64 @@
 <head>
 <title>Statistics</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-
-<style>
-
-.stat-grid{
-display:grid;
-grid-template-columns:1fr 1fr;
-gap:15px;
-margin-top:20px;
-}
-
-.stat-card{
-background:white;
-padding:20px;
-border-radius:12px;
-box-shadow:0 2px 8px rgba(0,0,0,0.05);
-}
-
-.progress{
-background:#eee;
-height:8px;
-border-radius:6px;
-margin-top:10px;
-}
-
-.progress-bar{
-height:8px;
-background:#2f5bd3;
-border-radius:6px;
-}
-
-.chart-box{
-background:white;
-padding:20px;
-margin-top:20px;
-border-radius:12px;
-text-align:center;
-}
-
-</style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
 
-<div class="dashboard">
+<div class="stats-page">
 
-<h2>Statistics</h2>
+<div class="stats-header">
+<h2>Financial Statistics</h2>
+<p>Track your income, expenses, and savings performance in real time.</p>
+</div>
 
 <div class="stat-grid">
 
 <div class="stat-card">
 <h4>Total Income</h4>
-<h2>₹15,000</h2>
+<h2 id="incomeValue">{{ currency_symbol }}{{ income }}</h2>
 <div class="progress">
-<div class="progress-bar" style="width:70%"></div>
+<div class="progress-bar" id="incomeBar" style="width:0%"></div>
 </div>
 </div>
 
 <div class="stat-card">
 <h4>Total Expense</h4>
-<h2>₹9,500</h2>
+<h2 id="expenseValue">{{ currency_symbol }}{{ expense }}</h2>
 <div class="progress">
-<div class="progress-bar" style="width:45%; background:red;"></div>
+<div class="progress-bar expense-bar" id="expenseBar" style="width:0%"></div>
 </div>
 </div>
 
 <div class="stat-card">
 <h4>Savings</h4>
-<h2>₹5,500</h2>
+<h2 id="savingsValue">{{ currency_symbol }}{{ savings }}</h2>
+<p class="stats-note">Net amount after expenses</p>
 </div>
 
 <div class="stat-card">
 <h4>Savings Rate</h4>
-<h2>36%</h2>
+<h2 id="savingsRate">0%</h2>
+<p class="stats-note">How much of income you keep</p>
 </div>
 
 </div>
 
-<div class="chart-box">
-<h4>Spending Chart</h4>
-<p>Chart integration ready (Chart.js can be added)</p>
+<div class="stats-chart-section">
+<div class="stat-card">
+<h4>Income vs Expense</h4>
+<div class="chart-wrap">
+<canvas id="incomeExpenseChart"></canvas>
+</div>
+</div>
+
+<div class="stat-card">
+<h4>Expense by Category</h4>
+<div class="chart-wrap small-chart-wrap">
+<canvas id="expenseCategoryBarChart"></canvas>
+</div>
+</div>
 </div>
 
 <div class="nav">
@@ -93,6 +71,156 @@ text-align:center;
 </div>
 
 </div>
+
+<script>
+let pieChart=null;
+let expenseCategoryBarChart=null;
+const currencySymbol = {{ currency_symbol|tojson }};
+
+const expenseCategoryColors=[
+"#06b6d4", "#f97316", "#facc15", "#1e3a8a", "#7e22ce", "#ef4444", "#14b8a6", "#a855f7", "#0ea5e9", "#84cc16"
+];
+
+function formatCurrency(value){
+return currencySymbol+Number(value).toLocaleString("en-IN", {maximumFractionDigits:2});
+}
+
+function updateBars(income, expense){
+const total = income + expense;
+const incomePct = total > 0 ? (income / total) * 100 : 0;
+const expensePct = total > 0 ? (expense / total) * 100 : 0;
+
+document.getElementById("incomeBar").style.width = incomePct.toFixed(1)+"%";
+document.getElementById("expenseBar").style.width = expensePct.toFixed(1)+"%";
+}
+
+function updatePieChart(income, expense){
+const canvas=document.getElementById("incomeExpenseChart");
+if(!canvas) return;
+
+if(!pieChart){
+pieChart = new Chart(canvas, {
+type:"pie",
+data:{
+labels:["Income", "Expense"],
+datasets:[{
+data:[income, expense],
+backgroundColor:["#1f8a4d", "#d64545"],
+borderColor:["#ffffff", "#ffffff"],
+borderWidth:2
+}]
+},
+options:{
+responsive:true,
+maintainAspectRatio:false,
+plugins:{
+legend:{
+position:"bottom"
+}
+}
+}
+});
+return;
+}
+
+pieChart.data.datasets[0].data=[income, expense];
+pieChart.update();
+}
+
+function getCategoryChartData(categoryMap, palette){
+const labels=Object.keys(categoryMap || {});
+const values=Object.values(categoryMap || {});
+
+if(labels.length===0){
+return {
+labels:["No data"],
+values:[0],
+colors:["#d5dcee"]
+};
+}
+
+const colors=labels.map((_, index)=>palette[index % palette.length]);
+return {labels, values, colors};
+}
+
+function updateExpenseCategoryBarChart(categoryMap){
+const canvas=document.getElementById("expenseCategoryBarChart");
+if(!canvas) return;
+
+const chartData=getCategoryChartData(categoryMap, expenseCategoryColors);
+
+if(!expenseCategoryBarChart){
+expenseCategoryBarChart = new Chart(canvas, {
+type:"bar",
+data:{
+labels:chartData.labels,
+datasets:[{
+label:"Expense (₹)",
+data:chartData.values,
+backgroundColor:chartData.colors,
+borderRadius:8,
+maxBarThickness:36
+}]
+},
+options:{
+responsive:true,
+maintainAspectRatio:false,
+scales:{
+x:{
+grid:{
+display:false
+}
+},
+y:{
+beginAtZero:true,
+ticks:{
+callback:function(value){
+return currencySymbol+value;
+}
+}
+}
+},
+plugins:{
+legend:{
+display:false
+}
+}
+}
+});
+return;
+}
+
+expenseCategoryBarChart.data.labels=chartData.labels;
+expenseCategoryBarChart.data.datasets[0].data=chartData.values;
+expenseCategoryBarChart.data.datasets[0].backgroundColor=chartData.colors;
+expenseCategoryBarChart.update();
+}
+
+async function refreshStats(){
+try{
+const response = await fetch("/stats_data", {cache:"no-store"});
+if(!response.ok) return;
+
+const data = await response.json();
+
+document.getElementById("incomeValue").innerText = formatCurrency(data.income);
+document.getElementById("expenseValue").innerText = formatCurrency(data.expense);
+document.getElementById("savingsValue").innerText = formatCurrency(data.savings);
+document.getElementById("savingsRate").innerText = data.savings_rate+"%";
+
+updateBars(data.income, data.expense);
+updatePieChart(data.income, data.expense);
+
+updateExpenseCategoryBarChart(data.expense_categories);
+}
+catch(error){
+return;
+}
+}
+
+refreshStats();
+setInterval(refreshStats, 3000);
+</script>
 
 </body>
 </html>

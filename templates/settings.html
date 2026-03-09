@@ -3,114 +3,102 @@
 <head>
 <title>Settings</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-
-<style>
-
-.setting-card{
-background:white;
-padding:18px;
-border-radius:12px;
-margin-top:15px;
-display:flex;
-justify-content:space-between;
-align-items:center;
-}
-
-.toggle{
-position:relative;
-width:50px;
-height:25px;
-}
-
-.toggle input{
-display:none;
-}
-
-.slider{
-position:absolute;
-cursor:pointer;
-background:#ccc;
-border-radius:25px;
-top:0;
-left:0;
-right:0;
-bottom:0;
-transition:.3s;
-}
-
-.slider:before{
-content:"";
-position:absolute;
-height:18px;
-width:18px;
-left:4px;
-bottom:4px;
-background:white;
-border-radius:50%;
-transition:.3s;
-}
-
-input:checked + .slider{
-background:#2f5bd3;
-}
-
-input:checked + .slider:before{
-transform:translateX(24px);
-}
-
-.reset-btn{
-background:#ff4d4d;
-color:white;
-padding:10px 20px;
-border:none;
-border-radius:8px;
-cursor:pointer;
-}
-
-</style>
 </head>
 
 <body>
 
-<div class="dashboard">
+<div class="settings-page">
 
+<div class="settings-header">
 <h2>Settings</h2>
+<p>Manage your preferences, budgeting controls, and account data.</p>
+</div>
 
-<!-- Currency -->
-<div class="setting-card">
-<span>Currency</span>
+{% if success %}
+<div class="status-banner">{{ success }}</div>
+{% endif %}
 
-<select>
-<option>₹ INR</option>
-<option>$ USD</option>
-<option>€ EUR</option>
+{% if error %}
+<p class="error">{{ error }}</p>
+{% endif %}
+
+<div class="settings-summary-grid">
+<div class="stat-card">
+<h4>Profile</h4>
+<h2>{{ user }}</h2>
+</div>
+<div class="stat-card">
+<h4>Transactions</h4>
+<h2>{{ transaction_count }}</h2>
+</div>
+<div class="stat-card">
+<h4>Total Income</h4>
+<h2>{{ currency_symbol }}{{ '%.2f'|format(total_income) }}</h2>
+</div>
+<div class="stat-card">
+<h4>Total Expense</h4>
+<h2>{{ currency_symbol }}{{ '%.2f'|format(total_expense) }}</h2>
+</div>
+</div>
+
+<div class="setting-card setting-danger">
+<div>
+<h4>Reset Transaction Data</h4>
+<p>Permanently deletes all your income and expense entries.</p>
+</div>
+<form method="POST" action="/reset_transactions" onsubmit="return confirm('Delete all your transactions? This cannot be undone.');">
+<button class="reset-btn" type="submit">Reset Data</button>
+</form>
+</div>
+
+<div class="setting-card setting-block">
+<div>
+<h4>Change Username</h4>
+<p>Update your login username securely.</p>
+</div>
+<form method="POST" action="/change_username" class="settings-inline-form">
+<input name="new_username" placeholder="New Username" required>
+<input name="current_password" type="password" placeholder="Current Password" required>
+<button type="submit" class="settings-action-btn">Update Username</button>
+</form>
+</div>
+
+<div class="setting-card setting-block">
+<div>
+<h4>Change Password</h4>
+<p>Use your current password to set a new one.</p>
+</div>
+<form method="POST" action="/change_password" class="settings-inline-form">
+<input name="current_password" type="password" placeholder="Current Password" required>
+<input name="new_password" type="password" placeholder="New Password (min 6 characters)" minlength="6" required>
+<input name="confirm_password" type="password" placeholder="Confirm New Password" minlength="6" required>
+<button type="submit" class="settings-action-btn">Update Password</button>
+</form>
+</div>
+
+<div class="setting-card setting-block">
+<div>
+<h4>Change Recovery Question</h4>
+<p>Update your recovery question and answer for account recovery.</p>
+</div>
+<form method="POST" action="/change_recovery" class="settings-inline-form">
+<select name="security_question" required>
+{% for key, question in recovery_questions.items() %}
+<option value="{{ key }}" {% if current_recovery_question == key %}selected{% endif %}>{{ question }}</option>
+{% endfor %}
 </select>
+<input name="security_answer" placeholder="New Recovery Answer" required>
+<input name="current_password" type="password" placeholder="Current Password" required>
+<button type="submit" class="settings-action-btn">Update Recovery</button>
+</form>
 </div>
 
-<!-- Dark Mode -->
-<div class="setting-card">
-<span>Dark Mode</span>
-
-<label class="toggle">
-<input type="checkbox" onclick="toggleDark()">
-<span class="slider"></span>
-</label>
+<div class="setting-card setting-logout">
+<div>
+<h4>Logout</h4>
+<p>Sign out from your account on this device.</p>
 </div>
-
-<!-- Notifications -->
-<div class="setting-card">
-<span>Notifications</span>
-
-<label class="toggle">
-<input type="checkbox" checked>
-<span class="slider"></span>
-</label>
-</div>
-
-<!-- Reset -->
-<div class="setting-card">
-<span>Reset Data</span>
-<button class="reset-btn" onclick="resetData()">Reset</button>
+<a href="/logout" class="settings-logout-btn">Logout</a>
 </div>
 
 <div class="nav">
@@ -121,20 +109,6 @@ cursor:pointer;
 </div>
 
 </div>
-
-<script>
-
-function resetData(){
-if(confirm("Delete all data?")){
-alert("Data cleared (backend integration needed)");
-}
-}
-
-function toggleDark(){
-document.body.classList.toggle("dark-mode");
-}
-
-</script>
 
 </body>
 </html>

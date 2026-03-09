@@ -27,40 +27,112 @@ cat.add(opt);
 
 </head>
 
-<body onload="updateCategory()">
+<body onload="updateCategory()" class="home-pro-page">
 
-<div class="main-container">
+<div class="home-pro-shell main-container">
 
 <!-- LEFT SIDE DASHBOARD -->
-<div class="left-panel">
+<div class="left-panel home-pro-left">
 
-<div class="top-bar">
+<div class="top-bar home-pro-topbar">
 <h2>Welcome {{ user }}</h2>
-<a href="/logout" class="logout">Logout</a>
+<p class="home-pro-subtitle">Your financial snapshot for today</p>
 </div>
 
-<div class="balance-card">
+{% if action_message %}
+<div class="status-banner">{{ action_message }}</div>
+{% endif %}
+
+<div class="balance-card home-pro-balance">
 <p>Current Balance</p>
-<h1>₹{{ balance }}</h1>
-<p>Income ₹{{ income }}</p>
-<p>Expense ₹{{ expense }}</p>
+<h1 class="balance-value">{{ currency_symbol }}{{ balance }}</h1>
+<p class="income-text">Income {{ currency_symbol }}{{ income }}</p>
+<p class="expense-text">Expense {{ currency_symbol }}{{ expense }}</p>
 </div>
 
-<div class="transaction-box">
+<div class="home-pro-kpis">
+<div class="home-pro-kpi-card income-kpi">
+<span>Income</span>
+<strong>{{ currency_symbol }}{{ income }}</strong>
+</div>
+<div class="home-pro-kpi-card expense-kpi">
+<span>Expense</span>
+<strong>{{ currency_symbol }}{{ expense }}</strong>
+</div>
+<div class="home-pro-kpi-card balance-kpi">
+<span>Net</span>
+<strong>{{ currency_symbol }}{{ balance }}</strong>
+</div>
+</div>
 
+<div class="transaction-box home-pro-transactions">
+
+<div class="transaction-head">
 <h3>Recent Transactions</h3>
+<div class="transaction-head-right">
+<form method="GET" action="/home" class="sort-form">
+<input type="hidden" name="filter" value="{{ current_filter }}">
+<select name="sort" class="sort-select" onchange="this.form.submit()">
+<option value="newest" {% if current_sort == 'newest' %}selected{% endif %}>Newest</option>
+<option value="oldest" {% if current_sort == 'oldest' %}selected{% endif %}>Oldest</option>
+<option value="amount_high" {% if current_sort == 'amount_high' %}selected{% endif %}>Amount High</option>
+<option value="amount_low" {% if current_sort == 'amount_low' %}selected{% endif %}>Amount Low</option>
+</select>
+</form>
+<span class="transaction-count" id="visibleTransactionCount">{{ transactions|length }} entries</span>
+</div>
+</div>
+
+{% if transactions %}
+<div class="transaction-filters">
+<a class="filter-btn {% if current_filter == 'all' %}active{% endif %}" href="/home?filter=all&sort={{ current_sort }}">All</a>
+<a class="filter-btn {% if current_filter == 'income' %}active{% endif %}" href="/home?filter=income&sort={{ current_sort }}">Income</a>
+<a class="filter-btn {% if current_filter == 'expense' %}active{% endif %}" href="/home?filter=expense&sort={{ current_sort }}">Expense</a>
+</div>
+{% endif %}
+
+<div class="transaction-list home-pro-transaction-list">
+
+{% if transactions %}
 
 {% for t in transactions %}
 
-<div class="transaction-item">
-<strong>{{ t[2] }}</strong> - {{ t[3] }}
+<div class="transaction-item home-pro-transaction-item {% if t[2] == 'Income' %}transaction-income{% else %}transaction-expense{% endif %}">
+<div class="transaction-main">
+<span class="transaction-type {% if t[2] == 'Income' %}type-income{% else %}type-expense{% endif %}">{{ t[2] }}</span>
+<div class="transaction-content">
+<p class="transaction-category">{{ t[3] }}</p>
 {% if t[4] %}
-<span class="desc">({{ t[4] }})</span>
+<p class="transaction-note">{{ t[4] }}</p>
+{% else %}
+<p class="transaction-note muted">No description</p>
 {% endif %}
-<span class="amount">₹{{ t[5] }}</span>
+</div>
+</div>
+<div class="transaction-right home-pro-transaction-right">
+<span class="amount {% if t[2] == 'Income' %}amount-income{% else %}amount-expense{% endif %}">{% if t[2] == 'Income' %}+{% else %}-{% endif %}{{ currency_symbol }}{{ t[5] }}</span>
+<div class="transaction-actions">
+<a class="action-btn edit-btn" href="/edit_transaction/{{ t[0] }}?filter={{ current_filter }}&sort={{ current_sort }}">Edit</a>
+<form method="POST" action="/delete_transaction/{{ t[0] }}" class="delete-form" onsubmit="return confirm('Delete this transaction?');">
+<input type="hidden" name="filter" value="{{ current_filter }}">
+<input type="hidden" name="sort" value="{{ current_sort }}">
+<button type="submit" class="action-btn delete-btn">Delete</button>
+</form>
+</div>
+</div>
 </div>
 
 {% endfor %}
+
+{% else %}
+
+<div class="transaction-empty">
+<p>No transactions yet. Add your first income or expense to get started.</p>
+</div>
+
+{% endif %}
+
+</div>
 
 </div>
 
@@ -68,11 +140,12 @@ cat.add(opt);
 
 
 <!-- RIGHT SIDE FORM -->
-<div class="right-panel">
+<div class="right-panel home-pro-right">
 
-<div class="form-card">
+<div class="form-card home-pro-form-card">
 
 <h3>Add Transaction</h3>
+<p class="home-pro-form-note">Record every movement to keep your reports accurate.</p>
 
 <form method="POST" action="/add_transaction">
 

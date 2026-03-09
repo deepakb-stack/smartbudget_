@@ -1,28 +1,272 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-<title>Advisor</title>
+<title>AI Advisor — SmartBudget</title>
 </head>
 
 <body>
+<div class="advisor-page">
 
-<div class="dashboard">
-
-<h2>AI Advisor</h2>
-
-<div class="placeholder">
-AI Chat coming soon.
+<!-- HEADER -->
+<div class="advisor-header">
+    <div class="advisor-title">
+        <div class="advisor-bot-icon">🤖</div>
+        <div>
+            <h2>SmartBudget Advisor</h2>
+            <span class="advisor-status">AI-powered financial insights</span>
+        </div>
+    </div>
+    <div class="advisor-kpis">
+        <div class="advisor-kpi income">
+            <span class="kpi-label">Income</span>
+            <span class="kpi-value">{{ currency_symbol }}{{ "%.2f"|format(income) }}</span>
+        </div>
+        <div class="advisor-kpi expense">
+            <span class="kpi-label">Expense</span>
+            <span class="kpi-value">{{ currency_symbol }}{{ "%.2f"|format(expense) }}</span>
+        </div>
+        <div class="advisor-kpi balance">
+            <span class="kpi-label">Balance</span>
+            <span class="kpi-value">{{ currency_symbol }}{{ "%.2f"|format(balance) }}</span>
+        </div>
+        <div class="advisor-kpi savings-rate">
+            <span class="kpi-label">Savings</span>
+            <span class="kpi-value">{{ savings_rate }}%</span>
+        </div>
+    </div>
 </div>
 
+<!-- CHAT AREA -->
+<div class="chat-container" id="chatContainer">
+
+    <!-- Welcome message -->
+    <div class="chat-row ai">
+        <div class="chat-avatar">🤖</div>
+        <div class="chat-bubble ai">
+            <strong>Hello, {{ user }}!</strong> I'm your SmartBudget AI Advisor.<br><br>
+            I can analyze your spending patterns, suggest saving plans, monitor your budget, and answer any financial questions. Try the suggestions below or ask me anything!
+        </div>
+    </div>
+
+</div>
+
+<!-- SUGGESTIONS -->
+<div class="suggestion-chips" id="suggestionChips">
+    <button class="chip" onclick="sendSuggestion('Analyze my spending and suggest where I can cut back')">✂️ Cut spending</button>
+    <button class="chip" onclick="sendSuggestion('Give me a detailed breakdown of my expenses by category with percentages')">📊 Expense breakdown</button>
+    <button class="chip" onclick="sendSuggestion('What are my top 3 biggest expenses and how can I reduce them?')">🔝 Top expenses</button>
+    <button class="chip" onclick="sendSuggestion('Create a realistic monthly saving plan to reach my savings goal')">🎯 Saving plan</button>
+    <button class="chip" onclick="sendSuggestion('Rate my financial health out of 10 and explain what I can improve')">❤️ Financial health</button>
+    <button class="chip" onclick="sendSuggestion('Compare my income vs expenses and tell me if I am on track')">📈 Income vs Expenses</button>
+</div>
+
+<!-- INPUT BAR -->
+<div class="chat-input-bar">
+    <div style="font-size:12px;color:#5b6c8b;margin:0 0 6px 6px;">Ask your own question:</div>
+    <div class="chat-input-wrap">
+        <textarea
+            id="chatInput"
+            placeholder="Ask about your finances..."
+            rows="1"
+            onkeydown="handleKeyDown(event)"
+            oninput="autoResize(this)"
+        ></textarea>
+        <button id="sendBtn" onclick="sendMessage()" title="Send message">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+        </button>
+    </div>
+</div>
+
+<!-- NAV -->
 <div class="nav">
-<a href="/home">Home</a>
-<a href="/stats">Stats</a>
-<a href="/advisor">Advisor</a>
-<a href="/settings">Settings</a>
+    <a href="/home">Home</a>
+    <a href="/stats">Stats</a>
+    <a href="/advisor" class="nav-active">Advisor</a>
+    <a href="/settings">Settings</a>
 </div>
 
 </div>
 
+<script>
+const chatContainer = document.getElementById('chatContainer');
+const chatInput = document.getElementById('chatInput');
+const sendBtn = document.getElementById('sendBtn');
+const suggestionChips = document.getElementById('suggestionChips');
+let history = [];
+let isGenerating = false;
+
+function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+function handleKeyDown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+    }
+}
+
+function scrollToBottom() {
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+function appendMessage(role, content) {
+    const row = document.createElement('div');
+    row.className = 'chat-row ' + role;
+
+    if (role === 'ai') {
+        row.innerHTML = '<div class="chat-avatar">🤖</div><div class="chat-bubble ai">' + formatMarkdown(content) + '</div>';
+    } else {
+        row.innerHTML = '<div class="chat-bubble user">' + escapeHtml(content) + '</div>';
+    }
+
+    chatContainer.appendChild(row);
+    scrollToBottom();
+    return row;
+}
+
+function showTyping() {
+    const row = document.createElement('div');
+    row.className = 'chat-row ai';
+    row.id = 'typingRow';
+    row.innerHTML = '<div class="chat-avatar">🤖</div><div class="chat-bubble ai typing-indicator"><span></span><span></span><span></span></div>';
+    chatContainer.appendChild(row);
+    scrollToBottom();
+}
+
+function hideTyping() {
+    const el = document.getElementById('typingRow');
+    if (el) el.remove();
+}
+
+function escapeHtml(text) {
+    const d = document.createElement('div');
+    d.textContent = text;
+    return d.innerHTML;
+}
+
+function formatMarkdown(text) {
+    // Basic markdown formatting for AI responses
+    let html = escapeHtml(text);
+    // Bold
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    // Bullet points
+    html = html.replace(/^[\-\*] (.+)$/gm, '<li>$1</li>');
+    html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+    // Numbered lists
+    html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+    // Line breaks
+    html = html.replace(/\n/g, '<br>');
+    // Clean up double br inside lists
+    html = html.replace(/<br><ul>/g, '<ul>');
+    html = html.replace(/<\/ul><br>/g, '</ul>');
+    html = html.replace(/<br><li>/g, '<li>');
+    return html;
+}
+
+function setInputEnabled(enabled) {
+    isGenerating = !enabled;
+    chatInput.disabled = !enabled;
+    sendBtn.disabled = !enabled;
+    sendBtn.style.opacity = enabled ? '1' : '0.5';
+    if (enabled) chatInput.focus();
+}
+
+function sendSuggestion(text) {
+    if (isGenerating) return;
+    chatInput.value = text;
+    sendMessage();
+}
+
+async function sendMessage() {
+    const msg = chatInput.value.trim();
+    if (!msg || isGenerating) return;
+
+    // Hide suggestion chips after first user message
+    suggestionChips.style.display = 'none';
+
+    appendMessage('user', msg);
+    history.push({ role: 'user', content: msg });
+    chatInput.value = '';
+    chatInput.style.height = 'auto';
+
+    setInputEnabled(false);
+    showTyping();
+
+    try {
+        const resp = await fetch('/advisor/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: msg, history: history })
+        });
+
+        if (!resp.ok) {
+            hideTyping();
+            const err = await resp.json();
+            appendMessage('ai', 'Error: ' + (err.error || 'Something went wrong.'));
+            setInputEnabled(true);
+            return;
+        }
+
+        hideTyping();
+
+        // Create AI message bubble for streaming
+        const aiRow = document.createElement('div');
+        aiRow.className = 'chat-row ai';
+        aiRow.innerHTML = '<div class="chat-avatar">🤖</div><div class="chat-bubble ai"></div>';
+        chatContainer.appendChild(aiRow);
+        const bubble = aiRow.querySelector('.chat-bubble');
+
+        let fullText = '';
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                const jsonStr = line.slice(6);
+                try {
+                    const data = JSON.parse(jsonStr);
+                    if (data.error) {
+                        fullText += data.error;
+                        bubble.innerHTML = formatMarkdown(fullText);
+                        scrollToBottom();
+                        break;
+                    }
+                    if (data.token) {
+                        fullText += data.token;
+                        bubble.innerHTML = formatMarkdown(fullText);
+                        scrollToBottom();
+                    }
+                    if (data.done) break;
+                } catch (e) { /* skip malformed */ }
+            }
+        }
+
+        history.push({ role: 'assistant', content: fullText });
+
+    } catch (err) {
+        hideTyping();
+        appendMessage('ai', 'Could not reach the AI service. Please make sure Ollama is running.');
+    }
+
+    setInputEnabled(true);
+}
+</script>
 </body>
 </html>

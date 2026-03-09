@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Edit Transaction</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+
+<script>
+function updateEditCategory(){
+
+let type=document.getElementById("editType").value;
+let cat=document.getElementById("editCategory");
+let currentCategory=cat.dataset.current;
+
+cat.innerHTML="";
+
+let income=["Salary","Business","Investment","Gift","Other"];
+let expense=["Food","Transport","Shopping","Bills","Entertainment","Health"];
+let list = type=="Income" ? income : expense;
+
+list.forEach(c=>{
+let opt=document.createElement("option");
+opt.value=c;
+opt.text=c;
+if(c===currentCategory){
+opt.selected=true;
+}
+cat.add(opt);
+});
+}
+</script>
+</head>
+
+<body onload="updateEditCategory()">
+
+<div class="main-container">
+
+<div class="left-panel">
+<div class="top-bar">
+<h2>Edit Transaction</h2>
+<a href="/home?filter={{ current_filter }}&sort={{ current_sort }}" class="logout">Back</a>
+</div>
+
+<div class="form-card">
+<form method="POST" action="/edit_transaction/{{ transaction[0] }}">
+
+<input type="hidden" name="filter" value="{{ current_filter }}">
+<input type="hidden" name="sort" value="{{ current_sort }}">
+
+<select name="type" id="editType" onchange="updateEditCategory()" required>
+<option value="Income" {% if transaction[2] == 'Income' %}selected{% endif %}>Income</option>
+<option value="Expense" {% if transaction[2] == 'Expense' %}selected{% endif %}>Expense</option>
+</select>
+
+<select name="category" id="editCategory" data-current="{{ transaction[3] }}" required></select>
+
+<input name="description" value="{{ transaction[4] }}" placeholder="Description (Optional)">
+<input name="amount" type="number" step="0.01" min="0.01" value="{{ transaction[5] }}" required>
+
+{% if error %}
+<p class="error">{{ error }}</p>
+{% endif %}
+
+<button type="submit" class="add-btn">Save Changes</button>
+
+</form>
+</div>
+</div>
+
+</div>
+
+</body>
+</html>
