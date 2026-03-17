@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transaction Calendar — SmartBudget</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+    <style>
+        .fc-theme-standard td, .fc-theme-standard th { border-color: #e4ebfa !important; }
+        .fc .fc-button-primary { background: #2f5bd3 !important; border-color: #2f5bd3 !important; }
+        .fc .fc-button-primary:hover { background: #1a356f !important; }
+        .fc .fc-toolbar-title { color: #173d92; font-weight: 700; font-family: 'Inter', sans-serif; padding: 0 10px; margin: 0 !important; display: inline-block !important; }
+        .fc .fc-toolbar-chunk { display: flex !important; align-items: center !important; justify-content: center !important; }
+    </style>
+</head>
+<body>
+<nav class="top-nav-pro">
+    <div class="nav-brand-pro"><span style="color:#2f5bd3;">Smart</span>Budget</div>
+    <div class="nav-links-pro">
+        <a href="/home">Dashboard</a>
+        <a href="/stats">Analytics</a>
+        <a href="/calendar" class="active">Calendar</a>
+        <a href="/advisor">AI Advisor</a>
+        <a href="/settings">Settings</a>
+    </div>
+    <div class="nav-profile-pro">
+        {% if user is defined %}
+            <span>{{ user }}</span>
+            <a href="/logout" class="logout-btn-pro">Logout</a>
+        {% endif %}
+    </div>
+</nav>
+
+<div class="calendar-pro-wrapper">
+    <div class="calendar-header-pro">
+        <div>
+            <h2>Your Monthly Timeline</h2>
+            <p style="color:#5b6c8b; margin:6px 0 0; font-size:15px;">Visualize your daily spending and earnings.</p>
+        </div>
+    </div>
+    <div id="calendar"></div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', async function() {
+        const response = await fetch('/calendar_data');
+        const data = await response.json();
+        
+        const events = data.map(trans => {
+            return {
+                title: `${trans.type === 'Income' ? '+' : '-'}{{ currency_symbol }}${trans.amount} ${trans.category}`,
+                start: trans.date,
+                backgroundColor: trans.type === 'Income' ? '#e8f9ef' : '#ffecef',
+                borderColor: trans.type === 'Income' ? '#1f8a4d' : '#d64545',
+                textColor: trans.type === 'Income' ? '#1f8a4d' : '#d64545',
+                allDay: true
+            };
+        });
+
+        const calendarEl = document.getElementById('calendar');
+        const calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            showNonCurrentDates: false,
+            headerToolbar: {
+                left: 'today',
+                center: 'prev title next',
+                right: ''
+            },
+            events: events,
+            eventContent: function(arg) {
+                const icon = arg.event.textColor === '#1f8a4d' ? '↑' : '↓';
+                return { html: `<div class="transaction-pill ${arg.event.textColor === '#1f8a4d' ? 'pill-income' : 'pill-expense'}">${icon} ${arg.event.title}</div>` };
+            },
+            height: 'auto'
+        });
+        
+        calendar.render();
+    });
+</script>
+</body>
+</html>

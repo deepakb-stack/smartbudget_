@@ -1,12 +1,35 @@
-from flask import Flask, render_template, request, redirect, session, jsonify, Response
+from flask import Flask, render_template, request, redirect, session, jsonify, Response # pyre-ignore[21]
 import sqlite3
 import os
 import json
-import requests as http_requests
-from werkzeug.security import generate_password_hash, check_password_hash
+import requests as http_requests # pyre-ignore[21]
+from werkzeug.security import generate_password_hash, check_password_hash # pyre-ignore[21]
 
 app = Flask(__name__)
 app.secret_key = "smartbudgetsecret"
+
+# ---------- CALENDAR PAGE ----------
+@app.route("/calendar")
+def calendar():
+    if "user" not in session:
+        return redirect("/")
+    settings = get_user_settings(session["user"])
+    return render_template("calendar.html", user=session["user"], currency_symbol=settings["currency_symbol"])
+
+@app.route("/calendar_data")
+def calendar_data():
+    if "user" not in session:
+        return jsonify([])
+    username = session["user"]
+    conn = sqlite3.connect("database.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT type, category, amount, date FROM transactions WHERE username=? ORDER BY date DESC", (username,))
+    data = cursor.fetchall()
+    conn.close()
+    result = [
+        {"type": t[0], "category": t[1], "amount": t[2], "date": t[3]} for t in data
+    ]
+    return jsonify(result)
 
 # ---------- OLLAMA CONFIG ----------
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
@@ -347,6 +370,9 @@ def home():
     username = session["user"]
     user_settings = get_user_settings(username)
 
+    import datetime
+    current_date = datetime.date.today().isoformat()
+
     conn = sqlite3.connect("database.db")
     cursor = conn.cursor()
 
@@ -396,6 +422,7 @@ def home():
         "home.html",
         user=username,
         transactions=transactions,
+        current_date=current_date,
         current_filter=filter_type,
         current_sort=sort_type,
         action_message=action_message,
@@ -422,14 +449,15 @@ def add_transaction():
     description = request.form.get("description", "")
 
     amount = request.form["amount"]
+    date = request.form.get("date")
 
     conn = sqlite3.connect("database.db")
     conn.execute(
         """
-        INSERT INTO transactions(username,type,category,description,amount)
-        VALUES(?,?,?,?,?)
+        INSERT INTO transactions(username,type,category,description,amount,date)
+        VALUES(?,?,?,?,?,?)
         """,
-        (username, ttype, category, description, amount)
+        (username, ttype, category, description, amount, date)
     )
     conn.commit()
     conn.close()
@@ -481,6 +509,7 @@ def edit_transaction(transaction_id):
         category = request.form["category"].strip()
         description = request.form.get("description", "").strip()
         amount = request.form["amount"]
+        date = request.form.get("date")
 
         filter_type = request.form.get("filter", "all").strip().lower()
         sort_type = request.form.get("sort", "newest").strip().lower()
@@ -524,10 +553,10 @@ def edit_transaction(transaction_id):
         cursor.execute(
             """
             UPDATE transactions
-            SET type=?, category=?, description=?, amount=?
+            SET type=?, category=?, description=?, amount=?, date=?
             WHERE id=? AND username=?
             """,
-            (ttype, category, description, amount_value, transaction_id, username)
+            (ttype, category, description, amount_value, date, transaction_id, username)
         )
         conn.commit()
         conn.close()
@@ -590,13 +619,35 @@ def stats():
     expense = sum(t[5] for t in data if t[2] == "Expense")
     savings = income - expense
 
+    # Month-wise stats
+    from collections import defaultdict
+    import datetime
+    month_stats = defaultdict(lambda: {"income": 0, "expense": 0, "savings": 0})
+    for t in data:
+        date_str = t[6] if len(t) > 6 else None
+        if date_str:
+            try:
+                dt = datetime.datetime.strptime(date_str, "%Y-%m-%d")
+                month_key = dt.strftime("%Y-%m")
+            except Exception:
+                month_key = "Unknown"
+        else:
+            month_key = "Unknown"
+        if t[2] == "Income":
+            month_stats[month_key]["income"] += t[5]
+        elif t[2] == "Expense":
+            month_stats[month_key]["expense"] += t[5]
+    for m in month_stats:
+        month_stats[m]["savings"] = month_stats[m]["income"] - month_stats[m]["expense"]
+
     return render_template(
         "stats.html",
         user=username,
         currency_symbol=user_settings["currency_symbol"],
         income=income,
         expense=expense,
-        savings=savings
+        savings=savings,
+        month_stats=month_stats
     )
 
 
@@ -607,50 +658,81 @@ def stats_data():
         return jsonify({"error": "Unauthorized"}), 401
 
     username = session["user"]
+    month_filter = request.args.get("month", "all")
 
     conn = sqlite3.connect("database.db")
     cursor = conn.cursor()
 
     cursor.execute(
-        "SELECT type, category, amount FROM transactions WHERE username=?",
+        "SELECT type, category, amount, date FROM transactions WHERE username=?",
         (username,)
     )
 
     data = cursor.fetchall()
     conn.close()
 
-    income = sum(row[2] for row in data if row[0] == "Income")
-    expense = sum(row[2] for row in data if row[0] == "Expense")
-    savings = income - expense
-    savings_rate = (savings / income * 100) if income > 0 else 0
+    # Get available months list
+    import datetime
+    from collections import defaultdict
+    available_months = set()
+    for t in data:
+        date_str = t[3] if len(t) > 3 else None
+        if date_str:
+            try:
+                dt = datetime.datetime.strptime(date_str, "%Y-%m-%d")
+                available_months.add(dt.strftime("%Y-%m"))
+            except Exception:
+                pass
+    available_months_sorted = sorted(list(available_months), reverse=True)
 
+    # Filter data if requested
+    filtered_data = []
+    for t in data:
+        date_str = t[3] if len(t) > 3 else None
+        month_key = "Unknown"
+        if date_str:
+            try:
+                dt = datetime.datetime.strptime(date_str, "%Y-%m-%d")
+                month_key = dt.strftime("%Y-%m")
+            except Exception:
+                pass
+        
+        if month_filter == "all" or month_filter == month_key:
+            filtered_data.append(t)
+
+    # Overall stats for the filtered data
+    income = float(sum(t[2] for t in filtered_data if t[0] == "Income"))
+    expense = float(sum(t[2] for t in filtered_data if t[0] == "Expense"))
+    savings = income - expense
+    savings_rate = (savings / income * 100) if income > 0 else 0.0
+
+    # Month-wise stats & categories over the filtered data (really only categories matter for the single month)
+    month_stats = defaultdict(lambda: {"income": 0.0, "expense": 0.0, "savings": 0.0})
     income_categories = {}
     expense_categories = {}
 
-    for row in data:
-        ttype, category, amount = row
+    for t in filtered_data:
+        ttype, category, amount, date_str = t[0], t[1], float(t[2]), t[3] if len(t) > 3 else None
+        
+        # Categories
         category_name = (category or "Other").strip() or "Other"
-
         if ttype == "Income":
-            income_categories[category_name] = (
-                income_categories.get(category_name, 0) + amount
-            )
+            income_categories[category_name] = income_categories.get(category_name, 0.0) + amount
         elif ttype == "Expense":
-            expense_categories[category_name] = (
-                expense_categories.get(category_name, 0) + amount
-            )
+            expense_categories[category_name] = expense_categories.get(category_name, 0.0) + amount
 
     return jsonify({
-        "income": round(income, 2),
-        "expense": round(expense, 2),
-        "savings": round(savings, 2),
-        "savings_rate": round(savings_rate, 1),
+        "income": float(f"{income:.2f}"),
+        "expense": float(f"{expense:.2f}"),
+        "savings": float(f"{savings:.2f}"),
+        "savings_rate": float(f"{savings_rate:.1f}"),
         "income_categories": {
-            k: round(v, 2) for k, v in income_categories.items()
+            k: float(f"{v:.2f}") for k, v in income_categories.items()
         },
         "expense_categories": {
-            k: round(v, 2) for k, v in expense_categories.items()
-        }
+            k: float(f"{v:.2f}") for k, v in expense_categories.items()
+        },
+        "available_months": available_months_sorted
     })
 
 
@@ -659,9 +741,12 @@ def build_financial_context(username):
     conn = sqlite3.connect("database.db")
     cursor = conn.cursor()
 
+    import datetime
+    from collections import defaultdict
+
     # Pull ALL transaction fields
     cursor.execute(
-        "SELECT id, type, category, description, amount FROM transactions WHERE username=? ORDER BY id DESC",
+        "SELECT id, type, category, description, amount, date FROM transactions WHERE username=? ORDER BY date DESC, id DESC",
         (username,)
     )
     rows = cursor.fetchall()
@@ -675,8 +760,8 @@ def build_financial_context(username):
     income_txns = [r for r in rows if r[1] == "Income"]
     expense_txns = [r for r in rows if r[1] == "Expense"]
 
-    total_income = sum(r[4] for r in income_txns)
-    total_expense = sum(r[4] for r in expense_txns)
+    total_income = float(sum(r[4] for r in income_txns))
+    total_expense = float(sum(r[4] for r in expense_txns))
     balance = total_income - total_expense
     savings_rate = (balance / total_income * 100) if total_income > 0 else 0
     total_txn_count = len(rows)
@@ -687,13 +772,14 @@ def build_financial_context(username):
     for r in rows:
         bucket = income_cats if r[1] == "Income" else expense_cats
         cat = (r[2] or "Other").strip() or "Other"
-        bucket.setdefault(cat, {"total": 0, "count": 0})
-        bucket[cat]["total"] += r[4]
+        if cat not in bucket:
+            bucket[cat] = {"total": 0.0, "count": 0}
+        bucket[cat]["total"] += float(r[4])
         bucket[cat]["count"] += 1
 
     # ---- Build context text ----
     lines = [
-        "=== OVERVIEW ===",
+        "=== ALL-TIME OVERALL OVERVIEW ===",
         f"Currency: {sym}",
         f"Total Income: {sym}{total_income:,.2f}",
         f"Total Expense: {sym}{total_expense:,.2f}",
@@ -703,8 +789,8 @@ def build_financial_context(username):
     ]
 
     # Budget & goals
-    monthly_budget = settings["monthly_budget"]
-    savings_goal = settings["savings_goal"]
+    monthly_budget = float(settings.get("monthly_budget", 0) or 0)
+    savings_goal = float(settings.get("savings_goal", 0) or 0)
     if monthly_budget > 0:
         budget_used_pct = (total_expense / monthly_budget * 100) if monthly_budget > 0 else 0
         budget_remaining = monthly_budget - total_expense
@@ -722,20 +808,70 @@ def build_financial_context(username):
 
     # ---- Income breakdown (pie chart data) ----
     if income_cats:
-        lines.append("\n=== INCOME BREAKDOWN (Pie Chart Data) ===")
+        lines.append("\n=== ALL-TIME OVERALL INCOME BREAKDOWN ===")
         for cat, info in sorted(income_cats.items(), key=lambda x: -x[1]["total"]):
             pct = (info["total"] / total_income * 100) if total_income > 0 else 0
             lines.append(f"  {cat}: {sym}{info['total']:,.2f} | {pct:.1f}% of income | {info['count']} transaction(s)")
 
     # ---- Expense breakdown (pie/bar chart data) ----
     if expense_cats:
-        lines.append("\n=== EXPENSE BREAKDOWN (Bar/Pie Chart Data) ===")
+        lines.append("\n=== ALL-TIME OVERALL EXPENSE BREAKDOWN ===")
         for cat, info in sorted(expense_cats.items(), key=lambda x: -x[1]["total"]):
             pct = (info["total"] / total_expense * 100) if total_expense > 0 else 0
             lines.append(f"  {cat}: {sym}{info['total']:,.2f} | {pct:.1f}% of expenses | {info['count']} transaction(s)")
 
+    # ---- Monthly Calendar Breakdown ----
+    from typing import Any, Dict
+    cal_stats: Dict[str, Dict[str, Any]] = {}
+    for r in rows:
+        ttype, amount, date_str, category = r[1], float(r[4]), r[5] if len(r) > 5 else None, r[2] or "Other"
+        month_key = "Unknown"
+        if date_str:
+            try:
+                dt = datetime.datetime.strptime(date_str, "%Y-%m-%d")
+                month_key = dt.strftime("%B %Y")
+            except Exception:
+                pass
+        
+        if month_key not in cal_stats:
+            cal_stats[month_key] = {"income": 0.0, "expense": 0.0, "cats": {}, "transactions": []}
+        
+        cal_stats[month_key]["transactions"].append(r)
+        
+        if ttype == "Income":
+            cal_stats[month_key]["income"] += amount
+        elif ttype == "Expense":
+            cal_stats[month_key]["expense"] += amount
+            cal_stats[month_key]["cats"][category] = cal_stats[month_key]["cats"].get(category, 0.0) + amount
+            
+    if cal_stats:
+        lines.append("\n=== MONTHLY CALENDAR BREAKDOWN ===")
+        # Note: Sorting by actual date key would be better than alpha if needed, but reverse string sort holds reasonably well for 'YYYY-MM' (We're printing '%B %Y', so alpha sort is actually broken natively. Let's fix that by extracting a sort key.)
+        
+        def month_sort_key(m_str):
+            try:
+                return datetime.datetime.strptime(m_str, "%B %Y")
+            except Exception:
+                return datetime.datetime.min
+
+        for m_key in sorted(cal_stats.keys(), key=month_sort_key, reverse=True):
+            m_inc = float(cal_stats[m_key]["income"])
+            m_exp = float(cal_stats[m_key]["expense"])
+            m_sav = m_inc - m_exp
+            lines.append(f"\n[{m_key}]")
+            lines.append(f"  Income: {sym}{m_inc:,.2f} | Expense: {sym}{m_exp:,.2f} | Savings/Net: {sym}{m_sav:,.2f}")
+            if cal_stats[m_key]["cats"]:
+                cat_summary = ", ".join([f"{k}: {sym}{v:,.2f}" for k, v in sorted(cal_stats[m_key]["cats"].items(), key=lambda item: item[1], reverse=True)])
+                lines.append(f"  Top Expenses: {cat_summary}")
+            
+            lines.append(f"  --- {m_key} Raw Transactions ---")
+            for r in cal_stats[m_key]["transactions"]:
+                desc_part = f" - {r[3]}" if r[3] else ""
+                date_part = f" ({r[5]})" if len(r) > 5 and r[5] else ""
+                lines.append(f"    {date_part} [{r[1]}] {r[2]}{desc_part}: {sym}{r[4]:,.2f}")
+
     # ---- Statistics / Averages ----
-    lines.append("\n=== STATISTICS ===")
+    lines.append("\n=== ALL-TIME OVERALL STATISTICS ===")
     if income_txns:
         avg_income = total_income / len(income_txns)
         max_income = max(income_txns, key=lambda r: r[4])
@@ -754,19 +890,14 @@ def build_financial_context(username):
         expense_to_income = (total_expense / total_income * 100)
         lines.append(f"Expense-to-Income Ratio: {expense_to_income:.1f}%")
 
-    # ---- Recent transactions (most recent first, max 50) ----
-    recent = rows[:50]
-    lines.append(f"\n=== RECENT TRANSACTIONS ({len(recent)} of {len(rows)} shown, most recent first) ===")
-    for r in recent:
-        desc_part = f" - {r[3]}" if r[3] else ""
-        lines.append(f"  [{r[1]}] {r[2]}{desc_part}: {sym}{r[4]:,.2f}")
+
 
     return {
         "context_text": "\n".join(lines),
-        "total_income": round(total_income, 2),
-        "total_expense": round(total_expense, 2),
-        "balance": round(balance, 2),
-        "savings_rate": round(savings_rate, 1),
+        "total_income": float(f"{total_income:.2f}"),
+        "total_expense": float(f"{total_expense:.2f}"),
+        "balance": float(f"{balance:.2f}"),
+        "savings_rate": float(f"{savings_rate:.1f}"),
         "currency_symbol": sym,
     }
 
@@ -775,16 +906,17 @@ SYSTEM_PROMPT = """You are SmartBudget Advisor, a friendly personal finance assi
 
 RULES:
 - Use ONLY the real numbers from the financial data below. Never invent figures.
+- EXTREMELY IMPORTANT: Do NOT mix 'ALL-TIME OVERALL' data with 'MONTHLY CALENDAR BREAKDOWN' data.
+- If the user asks about a SPECIFIC month (e.g. February), you MUST ONLY use data located strictly under that month's label inside `=== MONTHLY CALENDAR BREAKDOWN ===`. Do NOT cross-reference or combine data from other months or the all-time sections. Data inside `[Month Name]` is completely isolated.
 - Always use the correct currency symbol from the data.
 - Bold important numbers with **asterisks**.
-- Give specific, actionable advice based on the user's real finances.
+- CONCISENESS MATTERS: If the user asks a simple question (e.g., "What was my spending in March?"), answer ONLY that question in 1-2 short sentences. DO NOT provide extra unsolicited context or long paragraphs. 
+- ONLY provide long, detailed answers, action plans, ideas, or recommendations if the user explicitly asks for them.
+- Give specific, actionable advice based on the user's real finances (only when asked for advice).
 - Use bullet points or numbered steps for longer answers.
-- Be warm and encouraging. Celebrate good habits, gently flag concerns.
+- Be warm and encouraging, but crisp and direct.
 - Never show code, JSON, or technical details.
 - Never give vague/generic advice — always reference actual amounts and categories.
-- For spending questions: list top categories with amounts and percentages.
-- For saving advice: give concrete monthly targets and timelines.
-- For financial health: evaluate savings rate, expense-to-income ratio, and budget adherence.
 
 User's financial data:
 {financial_data}

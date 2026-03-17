@@ -1,11 +1,28 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Settings</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 
 <body>
+<nav class="top-nav-pro">
+    <div class="nav-brand-pro"><span style="color:#2f5bd3;">Smart</span>Budget</div>
+    <div class="nav-links-pro">
+        <a href="/home">Dashboard</a>
+        <a href="/stats">Analytics</a>
+        <a href="/calendar">Calendar</a>
+        <a href="/advisor">AI Advisor</a>
+        <a href="/settings" class="active">Settings</a>
+    </div>
+    <div class="nav-profile-pro">
+        {% if user is defined %}
+            <span>{{ user }}</span>
+            <a href="/logout" class="logout-btn-pro">Logout</a>
+        {% endif %}
+    </div>
+</nav>
 
 <div class="settings-page">
 
@@ -101,12 +118,7 @@
 <a href="/logout" class="settings-logout-btn">Logout</a>
 </div>
 
-<div class="nav">
-<a href="/home">Home</a>
-<a href="/stats">Stats</a>
-<a href="/advisor">Advisor</a>
-<a href="/settings">Settings</a>
-</div>
+
 
 </div>
 
